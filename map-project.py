@@ -1,7 +1,8 @@
 import cv2 as cv
 import numpy as np
-import urllib.request
 import random
+
+from tiles import Tiles, url_to_image 
 
 # elevation tiles and normal maps :
 # https://www.mapzen.com/blog/elevation/
@@ -13,19 +14,14 @@ import random
 # https://www.mapzen.com/blog/tangram-heightmapper/
 
 
-def url_to_image(url):
-    """Synchronously load a url in an opencv image"""
-    resp = urllib.request.urlopen(url)
-    image = np.asarray(bytearray(resp.read()), dtype="uint8")
-    image = cv.imdecode(image, cv.IMREAD_COLOR)
-    return image
-
 
 z = 0  # zoom level
 x = 0
 y = 0
 
 max_zoom = 15  # stamen is 18
+
+
 
 worldmap = url_to_image(
     "https://stamen-tiles-a.a.ssl.fastly.net/terrain-background/0/0/0.png")
