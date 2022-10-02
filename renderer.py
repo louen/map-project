@@ -6,12 +6,13 @@ import concurrent.futures
 import itertools
 import time
 
+from geometry import project
 from tiles import Tiles
 
-tile_size = 256
 
 
 def get_tile(tiles: Tiles, x0, y0, x, y, z, output):
+    tile_size = Tiles.TILE_SIZE
     """Function called to get tile data for a given thread, writes to output"""
     data = tiles.get_tile(x, y, z)
     assert(data.shape == (tile_size, tile_size, 3) and data.dtype == np.uint8)
@@ -30,8 +31,8 @@ def render_tiles(tiles, x0, y0, x1, y1, z, interactive=True):
     thread_count =  multiprocessing.cpu_count() - (1 if interactive else 0)
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=thread_count)
 
-    size_x = (x1 - x0 + 1) * tile_size
-    size_y = (y1 - y0 + 1) * tile_size
+    size_x = (x1 - x0 + 1) * Tiles.TILE_SIZE 
+    size_y = (y1 - y0 + 1) * Tiles.TILE_SIZE 
 
     result = np.zeros((size_y, size_x, 3), dtype=np.uint8)
 
@@ -63,4 +64,13 @@ def render_tiles(tiles, x0, y0, x1, y1, z, interactive=True):
 
 terrain = Tiles(
     "https://stamen-tiles-b.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png", 18)
-render_tiles(terrain, 6, 20, 20, 30, 6, True)
+
+
+LA_coords = (34.042379, -118.256078)
+LA_proj = np.array(project(LA_coords[0],LA_coords[1]))
+
+zoom = 13
+
+LA_proj = (np.floor(2**zoom * LA_proj)).astype(int)
+
+render_tiles(terrain, LA_proj[0]-10, LA_proj[1]-10, LA_proj[0]+10, LA_proj[1]+10, zoom, True)

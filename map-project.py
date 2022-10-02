@@ -22,7 +22,6 @@ y = 0
 max_zoom = 15  # stamen is 18
 
 
-
 worldmap = url_to_image(
     "https://stamen-tiles-a.a.ssl.fastly.net/terrain-background/0/0/0.png")
 

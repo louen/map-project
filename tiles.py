@@ -10,6 +10,7 @@ cache_folder = "tilecache"
 pathlib.Path(cache_folder).mkdir(exist_ok=True) 
 
 
+
 def url_to_image(url:str):
     """Synchronously load a url in an opencv image"""
     h = hashlib.sha1(url.encode(encoding='UTF-8'))
@@ -26,6 +27,8 @@ def url_to_image(url:str):
     return image
 
 class Tiles:
+
+    TILE_SIZE = 256
     def __init__(self, url_template,max_zoom):
         self.url_template = url_template
         self.max_zoom = max_zoom
