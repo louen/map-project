@@ -1,12 +1,28 @@
-import urllib.request
 import numpy as np
 import cv2 as cv
 
-def url_to_image(url):
+import urllib.request
+import pathlib 
+import hashlib
+
+
+cache_folder = "tilecache"
+pathlib.Path(cache_folder).mkdir(exist_ok=True) 
+
+
+def url_to_image(url:str):
     """Synchronously load a url in an opencv image"""
-    resp = urllib.request.urlopen(url)
-    image = np.asarray(bytearray(resp.read()), dtype="uint8")
+    h = hashlib.sha1(url.encode(encoding='UTF-8'))
+    cache_file = pathlib.Path(cache_folder).joinpath(f"{h.hexdigest()}.png")
+    if cache_file.exists():
+        image = np.asarray(bytearray(open(cache_file, "rb").read()))
+    else:
+        resp = urllib.request.urlopen(url)
+        image = np.asarray(bytearray(resp.read()), dtype="uint8")
     image = cv.imdecode(image, cv.IMREAD_COLOR)
+
+    if not cache_file.exists():
+        cv.imwrite(str(cache_file), image)
     return image
 
 class Tiles:
