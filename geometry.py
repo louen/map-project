@@ -1,7 +1,8 @@
 import numpy as np
 
 def project(latitude:float, longitude:float):
-    siny = np.sin(( latitude * np.pi) / 180.0);
+    """ return the Mercator coordinates in 0,1 from latitude and longiture"""
+    siny = np.sin(( latitude * np.pi) / 180.0)
 
     # Truncating to 0.9999 effectively limits latitude to 89.189. This is
     # about a third of a tile past the edge of the world tile.

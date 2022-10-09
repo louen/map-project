@@ -25,6 +25,10 @@ max_zoom = 15  # stamen is 18
 worldmap = url_to_image(
     "https://stamen-tiles-a.a.ssl.fastly.net/terrain-background/0/0/0.png")
 
+stencil = url_to_image(
+    
+)
+
 
 while True:
     normal_url = f"https://s3.amazonaws.com/elevation-tiles-prod/normal/{z}/{x}/{y}.png"
