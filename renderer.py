@@ -13,8 +13,8 @@ from tiles import Tiles
 
 
 def get_tile(tiles: Tiles, x0, y0, x, y, z, output):
-    tile_size = Tiles.TILE_SIZE
     """Function called to get tile data for a given thread, writes to output"""
+    tile_size = Tiles.TILE_SIZE
     data = tiles.get_tile(x, y, z)
 
     if data is not None:
@@ -75,23 +75,15 @@ def render_tiles(tiles, x0, y0, x1, y1, z, interactive=True):
     return (result, success == len(futures))
 
 
-terrain = Tiles(
-    "https://stamen-tiles-{r0}.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.png", 18, [lambda : random.choice(['a','b','c','d'])])
+def aabb_extents(aabb):
+    """Compute the extends of an aabb"""
+    return aabb[1] - aabb[0]
 
-toner = Tiles(
-    "https://stamen-tiles.a.ssl.fastly.net/toner/{z}/{x}/{y}.png", 15
-)
+def aabb_ratio(aabb):
+    """Compute the aspect ratio of an aabb"""
+    extents = aabb_extents(aabb)
+    return extents[0] / extents[1]
 
-height = Tiles (
-    "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png",15
-)
-
-def get_tile_delta_pixels(points, zoom):
-    tiles_per_unit = 2**zoom
-    points_in_tiles = tiles_per_unit * points
-    tiles = np.floor(points_in_tiles).astype(int)
-    deltas = (points_in_tiles - tiles)* Tiles.TILE_SIZE
-    return tiles, deltas
 
 def get_render_params( latlongs, max_zoom:int, width:int, margin:int, aspect_ratio:float = 1.0 ):
     """
@@ -101,82 +93,86 @@ def get_render_params( latlongs, max_zoom:int, width:int, margin:int, aspect_rat
         - has a margin of `margin` pixels around the points of interest
         - has the given aspect ratio
     """
-
     # project all in mercator
     projs = np.array([ project(*latlong) for latlong in latlongs])
+    # AABB of the target points
     aabb = np.array([projs.min(axis=0), projs.max(axis=0)])
-    extents = aabb[1] - aabb[0] 
+    
 
     # TODO: handle the case where the aabb actually strides the 180° meridian
 
-
     # Find the apropriate zoom level 
-    max_extents = max (extents.max(), 0.0001)
+    max_extents = max (aabb_extents(aabb).max(), 0.0001)
     z = np.ceil(np.log2(( width - 2 * margin) / (max_extents * Tiles.TILE_SIZE)))
     z = int(min(z, max_zoom))
 
+
+    # Now we determined the zoom level have three different yardsticks.
+    # - "natural" map units where x, y range from 0 to 1
+    # - tiles with x,y range from 0 to 2^z
+    # - pixels with x,y range from 0 to 2^z * (tile width)
+
     tiles_per_unit = 2**z
     pixel_per_unit = tiles_per_unit * Tiles.TILE_SIZE
-    
+
     # Extend the area of interest by the margin 
     margin_ext = np.ones(2) * (margin / pixel_per_unit)
     aabb[0] -= margin_ext
     aabb[1] += margin_ext
+
+    # aspect ratio = width / height
+    # expand the aabb to fit the target aspect ratio
+    extents = aabb_extents(aabb) 
+    ratio = aabb_ratio(aabb) 
+
+    if aspect_ratio > ratio:
+        # widen
+        new_width = extents[1] *  aspect_ratio
+        width_extension = new_width - extents[0]
+        aabb[0][0] -=  0.5* width_extension
+        aabb[1][0] += 0.5 * width_extension
+    elif aspect_ratio < ratio:
+        # heighten
+        new_height = extents[0] / aspect_ratio
+        height_extension = new_height - extents[1]
+        aabb[0][1] -= 0.5 * height_extension
+        aabb[1][1] += 0.5 * height_extension
 
     # AABB in pixels of the whole map
     aabb_pixels = aabb * pixel_per_unit
     aabb_tiles = aabb * tiles_per_unit
 
     # Compute the tiles covering the area
-    topleft_tile = np.floor( aabb_tiles[0]).astype(int)
+    topleft_tile = np.floor(aabb_tiles[0]).astype(int)
     bottomright_tile = np.ceil(aabb_tiles[1]).astype(int)
 
-
     topleft_pixel = np.floor(aabb_pixels[0] - topleft_tile *  Tiles.TILE_SIZE).astype(int)
+    bottomright_pixel = np.floor(aabb_pixels[1] - topleft_tile * Tiles.TILE_SIZE).astype(int)
 
 
-    return topleft_tile, bottomright_tile, z, topleft_pixel
+    return topleft_tile, bottomright_tile, z, topleft_pixel, bottomright_pixel
 
+# Heightmap computation. TODO: move this to a file and test
+#img, _ = render_tiles(toner, tl[0], tl[1], br[0], br[1], z, True)
 
+#img, _ = render_tiles(height, tl[0], tl[1], br[0], br[1], z, True)
 
+#height = (img[:,:,2] * 256 + img[:,:,1] + img[:,:,0] / 256) - 32768
 
+#_, thres = cv.threshold(height, 0, 1.0, type=cv.THRESH_BINARY)
 
-#img = terrain.get_tile(6449,4055,13)
-#cv.imshow("", img)
-#cv.waitKey(0)
-    
-LA = (33.840752, -118.051364)
-SF = (37.921138, -122.578390)
-JT = (33.683071, -115.806942)
-NOLA = (29.976, -90.13)
+# height_pos = thres * height
+# height_pos = cv.normalize(height_pos, height_pos, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
+# height_neg = -(1.0 - thres) * height
+# height_neg = cv.normalize(height_neg, height_neg, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
 
-tl, br, z ,pix, = get_render_params([LA, SF, JT], terrain.max_zoom, 500, 100, 1.0)
+# height_pos = cv.applyColorMap(height_pos, cv.COLORMAP_HOT)
+# height_neg = cv.applyColorMap(height_neg, cv.COLORMAP_OCEAN)  #* np.repeat(np.expand_dims(1.0 - thres,2), 3, axis = 2)
 
-#tl, br, z, pix = get_render_params([NOLA], 12, 2000,900, 1.0)
-
-
-
-
-img, _ = render_tiles(toner, tl[0], tl[1], br[0], br[1], z, True)
-
-img, _ = render_tiles(height, tl[0], tl[1], br[0], br[1], z, True)
-
-height = (img[:,:,2] * 256 + img[:,:,1] + img[:,:,0] / 256) - 32768
-
-_, thres = cv.threshold(height, 0, 1.0, type=cv.THRESH_BINARY)
-
-height_pos = thres * height
-height_pos = cv.normalize(height_pos, height_pos, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-height_neg = -(1.0 - thres) * height
-height_neg = cv.normalize(height_neg, height_neg, alpha=0, beta=255, norm_type=cv.NORM_MINMAX, dtype=cv.CV_8U)
-
-height_pos = cv.applyColorMap(height_pos, cv.COLORMAP_HOT)
-height_neg = cv.applyColorMap(height_neg, cv.COLORMAP_OCEAN)  #* np.repeat(np.expand_dims(1.0 - thres,2), 3, axis = 2)
-
-cv.imshow("Render", height_neg + height_pos)
+# cv.imshow("Render", height_neg + height_pos)
 
 
 
 #img = cv.rectangle(img, pix, pix + np.array([5000,5000]), (0,0,255), 3)
 #cv.imshow("Render", img)
-cv.waitKey(0)
+# cv.waitKey(0)

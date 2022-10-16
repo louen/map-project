@@ -39,10 +39,12 @@ def url_to_image(url: str):
 
 
 class Tiles:
-
-    TILE_SIZE = 256
+    """Tiles from a given data end point."""
+    TILE_SIZE = 256 # size of a tile, in pixels
 
     def __init__(self, url_template, max_zoom, replacements=[]):
+        """URL templates requires {x}, {y} and {z} plus optional {rN} replacement strings
+        with lambda functions."""
         self.url_template = url_template
         self.max_zoom = max_zoom
         self.replacements = replacements
